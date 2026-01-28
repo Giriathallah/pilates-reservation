@@ -1,0 +1,108 @@
+# =====================================
+# 1. General / OS Generated Files
+# =====================================
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.DS_Store?
+ehthumbs.db
+.AppleDouble
+.LSOverride
+
+# =====================================
+# 2. Environment & Secret Files
+# =====================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Midtrans & JWT secrets
+*.key
+*.pem
+*.crt
+
+# =====================================
+# 3. Build & Dependency Artifacts
+# =====================================
+
+# Go
+/backend/vendor/
+backend/diro-pilates-backend
+/backend/*.exe
+/backend/*.exe~
+/backend/*.test
+/backend/*.out
+
+
+
+# Next.js
+/frontend/.next/
+/frontend/out/
+/frontend/node_modules/
+/frontend/.next/cache/
+/frontend/.turbo/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =====================================
+# 4. Docker & Database
+# =====================================
+docker-compose.override.yml
+*.dockerignore
+postgres-data/
+pgdata/
+*.sql.bak
+*.dump
+
+# =====================================
+# 5. Editor & IDE Files
+# =====================================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+
+# =====================================
+# 6. Testing & Coverage
+# =====================================
+coverage/
+*.coverprofile
+*.out
+
+# =====================================
+# 7. Temporary / Build Files
+# =====================================
+tmp/
+dist/
+build/
+*.tmp
+*.bak
+*.swp
+
+# =====================================
+# 8. macOS / Windows Specific
+# =====================================
+.DS_Store
+ehthumbs.db
+Icon?
+Thumbs.db
+
+# =====================================
+# 9. Optional: Keep these if needed
+# =====================================
+# !public/           # Uncomment if you have public assets you want to commit
+# !src/types/        # Uncomment if you have custom types to commit

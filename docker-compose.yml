@@ -1,0 +1,16 @@
+# version: '3.8'
+services:
+  db:
+    image: postgres:16
+    restart: always
+    environment:
+      POSTGRES_USER: admin # Ganti dengan username Anda, e.g., 'admin'
+      POSTGRES_PASSWORD: asdasdasd # Ganti dengan password kuat
+      POSTGRES_DB: pilates_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
