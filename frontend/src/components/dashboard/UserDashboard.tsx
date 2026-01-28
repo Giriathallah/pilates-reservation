@@ -1,31 +1,3 @@
-// "use client";
-
-// import { useEffect, useState } from "react";
-// import Link from "next/link";
-// import api from "@/lib/api";
-// import { format } from "date-fns";
-
-// interface User {
-//     id: string;
-//     name: string;
-//     email: string;
-//     role: string;
-// }
-
-// interface Booking {
-//     id: string;
-//     created_at: string;
-//     status: string;
-//     Court: {
-//         name: string;
-//     };
-//     schedule: {
-//         date: string;
-//         start_time: string;
-//         end_time: string;
-//     };
-//     total_amount: number;
-// }
 
 "use client";
 
@@ -78,6 +50,14 @@ export default function UserDashboard({ user }: { user: User }) {
         fetchBookings();
     }, []);
 
+    // Helper to parse schedule date/time safely
+    const getScheduleDate = (dateStr: string, timeStr: string) => {
+        // dateStr is like "2026-01-31T00:00:00Z"
+        // timeStr is like "09:00" or "09:00:00"
+        const yyyymmdd = dateStr.split("T")[0];
+        return parseISO(`${yyyymmdd}T${timeStr}`);
+    };
+
     // Derived Stats
     const stats = useMemo(() => {
         const now = new Date();
@@ -90,8 +70,8 @@ export default function UserDashboard({ user }: { user: User }) {
 
         // Next Session: Earliest future paid booking
         const upcoming = paidBookings
-            .filter(b => isFuture(parseISO(b.schedule.date + "T" + b.schedule.start_time)))
-            .sort((a, b) => new Date(a.schedule.date).getTime() - new Date(b.schedule.date).getTime());
+            .filter(b => isFuture(getScheduleDate(b.schedule.date, b.schedule.start_time)))
+            .sort((a, b) => getScheduleDate(a.schedule.date, a.schedule.start_time).getTime() - getScheduleDate(b.schedule.date, b.schedule.start_time).getTime());
 
         const nextSession = upcoming.length > 0 ? upcoming[0] : null;
 
@@ -108,13 +88,13 @@ export default function UserDashboard({ user }: { user: User }) {
             return bookings.filter(b => b.status === "pending");
         } else if (activeTab === "upcoming") {
             return bookings
-                .filter(b => (b.status === "paid" || b.status === "confirmed") && isFuture(parseISO(b.schedule.date + "T" + b.schedule.start_time)))
-                .sort((a, b) => new Date(a.schedule.date).getTime() - new Date(b.schedule.date).getTime());
+                .filter(b => (b.status === "paid" || b.status === "confirmed") && isFuture(getScheduleDate(b.schedule.date, b.schedule.start_time)))
+                .sort((a, b) => getScheduleDate(a.schedule.date, a.schedule.start_time).getTime() - getScheduleDate(b.schedule.date, b.schedule.start_time).getTime());
         } else {
             // History
             return bookings
-                .filter(b => isPast(parseISO(b.schedule.date + "T" + b.schedule.start_time)) || b.status === "cancelled" || b.status === "failed")
-                .sort((a, b) => new Date(b.schedule.date).getTime() - new Date(a.schedule.date).getTime());
+                .filter(b => isPast(getScheduleDate(b.schedule.date, b.schedule.start_time)) || b.status === "cancelled" || b.status === "failed")
+                .sort((a, b) => getScheduleDate(b.schedule.date, b.schedule.start_time).getTime() - getScheduleDate(a.schedule.date, a.schedule.start_time).getTime());
         }
     }, [bookings, activeTab]);
 
@@ -189,9 +169,9 @@ export default function UserDashboard({ user }: { user: User }) {
                                         </p>
                                     </div>
                                     <div className="flex flex-col gap-2 w-full md:w-auto">
-                                        <button className="bg-white text-dark-grey px-6 py-3 rounded-full font-bold hover:bg-gray-100 transition-colors w-full text-center">
+                                        {/* <button className="bg-white text-dark-grey px-6 py-3 rounded-full font-bold hover:bg-gray-100 transition-colors w-full text-center">
                                             View Ticket
-                                        </button>
+                                        </button> */}
                                     </div>
                                 </div>
                                 {/* Decorative Circles */}
@@ -254,6 +234,9 @@ export default function UserDashboard({ user }: { user: User }) {
                                                         {booking.status === 'pending' && (
                                                             <span className="text-[10px] font-bold uppercase bg-red-100 text-red-600 px-2 py-0.5 rounded-full animate-pulse">Unpaid</span>
                                                         )}
+                                                        {(booking.status === 'paid' || booking.status === 'confirmed') && (
+                                                            <span className="text-[10px] font-bold uppercase bg-green-100 text-green-600 px-2 py-0.5 rounded-full">Paid</span>
+                                                        )}
                                                     </div>
                                                     <p className="text-sm text-gray-500 mb-1">
                                                         {format(new Date(booking.schedule.date), "EEEE")} • {booking.schedule.start_time.substring(0, 5)} - {booking.schedule.end_time.substring(0, 5)}
@@ -272,8 +255,8 @@ export default function UserDashboard({ user }: { user: User }) {
                                                         Book Again
                                                     </Link>
                                                 ) : (
-                                                    <button className="flex-1 md:flex-none px-4 py-2 text-sm font-bold text-gray-500 hover:text-dark-grey">
-                                                        Details
+                                                    <button className="flex-1 md:flex-none px-4 py-2 text-sm font-bold text-gray-500 hover:text-dark-grey cursor-default">
+                                                        Confirmed
                                                     </button>
                                                 )}
                                             </div>

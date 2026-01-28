@@ -64,8 +64,15 @@ export default function ReservationPage() {
                 // Note: Ensure backend returns reservation_id in response. Checked controller, it does: "reservation_id": reservation.ID
 
                 window.snap.pay(snap_token, {
-                    onSuccess: function (result: any) {
-                        router.push(`/reservations/success?id=${reservationId}`);
+                    onSuccess: async function (result: any) {
+                        try {
+                            // Proactive update for localhost environment
+                            await api.post(`/reservations/${reservationId}/mark-paid`);
+                        } catch (e) {
+                            console.error("Mark paid failed", e);
+                        } finally {
+                            router.push(`/reservations/success?id=${reservationId}`);
+                        }
                     },
                     onPending: function (result: any) {
                         router.push(`/reservations/success?id=${reservationId}&status=pending`);
@@ -77,7 +84,6 @@ export default function ReservationPage() {
                     onClose: function () {
                         setError("Payment window closed. Please try again.");
                         setProcessing(false);
-                        // Optional: Reload to release lock if needed, or just let user retry
                     }
                 });
             } else {

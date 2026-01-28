@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
     const pathname = usePathname();
+    const { logout } = useAuth();
 
     const links = [
         { href: "/admin/dashboard", label: "Dashboard" },
@@ -29,8 +31,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                                 key={link.href}
                                 href={link.href}
                                 className={`block px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive
-                                        ? "bg-black text-white"
-                                        : "text-gray-600 hover:bg-gray-100"
+                                    ? "bg-black text-white"
+                                    : "text-gray-600 hover:bg-gray-100"
                                     }`}
                             >
                                 {link.label}
@@ -38,13 +40,19 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                         );
                     })}
                 </nav>
-                <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200">
+                <div className="absolute bottom-0 w-64 p-4 border-t border-gray-200 bg-gray-50 space-y-2">
                     <Link
-                        href="/dashboard"
-                        className="block w-full px-4 py-2 text-center text-sm text-gray-600 hover:text-black"
+                        href="/"
+                        className="block w-full px-4 py-2 text-center text-sm font-medium text-gray-600 hover:text-black hover:bg-white rounded-lg transition-all"
                     >
                         ← Back to App
                     </Link>
+                    <button
+                        onClick={logout}
+                        className="block w-full px-4 py-2 text-center text-sm font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all"
+                    >
+                        Log Out
+                    </button>
                 </div>
             </aside>
 

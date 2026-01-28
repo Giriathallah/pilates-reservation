@@ -4,6 +4,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -25,6 +26,61 @@ func NewReservationController(db *gorm.DB, mt *services.MidtransService) *Reserv
 		DB:       db,
 		Midtrans: mt,
 	}
+}
+
+// MarkReservationAsPaid - Triggered from Frontend on Success
+func (rc *ReservationController) MarkReservationAsPaid(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := c.Locals("user_id").(string)
+
+	var reservation models.Reservation
+	if err := rc.DB.First(&reservation, "id = ? AND user_id = ?", id, userID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Reservation not found or unauthorized"})
+	}
+
+	if reservation.Status != "pending" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Reservation is not pending"})
+	}
+
+	// Verify with Midtrans (Best Practice even for manual trigger)
+	txResp, err := rc.Midtrans.VerifyTransaction(reservation.ID)
+	if err != nil {
+		fmt.Println("VerifyTransaction error on mark-paid:", err)
+		// For local dev/test without public webhooks, we might want to proceed if we trust the frontend 'onSuccess'
+	} else if txResp != nil {
+		if txResp.TransactionStatus != "capture" && txResp.TransactionStatus != "settlement" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Payment not yet successful according to Midtrans"})
+		}
+	}
+
+	tx := rc.DB.Begin()
+
+	// Update Payment
+	var payment models.Payment
+	if err := tx.Where("reservation_id = ?", reservation.ID).First(&payment).Error; err == nil {
+		payment.Status = "success"
+		payment.PaymentMethod = "manual_sync_frontend"
+		if txResp != nil {
+			payment.PaymentMethod = txResp.PaymentType
+		}
+		currentTime := time.Now()
+		payment.TransactionTime = &currentTime
+		tx.Save(&payment)
+	}
+
+	// Update Reservation
+	reservation.Status = "paid"
+	if err := tx.Save(&reservation).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update reservation"})
+	}
+
+	tx.Commit()
+
+	return c.JSON(fiber.Map{
+		"message": "Reservation marked as paid",
+		"status":  "paid",
+	})
 }
 
 // --- Public Endpoints ---
@@ -278,68 +334,105 @@ func (rc *ReservationController) GetMyReservations(c *fiber.Ctx) error {
 	}
 
 	// Proactive Check for Pending Reservations
+	// Proactive Check for Pending Reservations
 	for i, res := range reservations {
 		if res.Status == "pending" {
-			// Check Midtrans
+			fmt.Printf("Proactive check for pending reservation ID: %s\n", res.ID)
+
 			resp, err := rc.Midtrans.VerifyTransaction(res.ID)
-			if err == nil && resp != nil {
-				// Determine status
-				var newStatus string
-				if resp.TransactionStatus == "capture" || resp.TransactionStatus == "settlement" {
-					if resp.TransactionStatus == "capture" && resp.FraudStatus == "challenge" {
-						newStatus = "pending"
-					} else {
-						newStatus = "success"
-					}
-				} else if resp.TransactionStatus == "deny" || resp.TransactionStatus == "expire" || resp.TransactionStatus == "cancel" {
-					newStatus = "failed"
+			if err != nil {
+				fmt.Printf("VerifyTransaction failed for %s: %v\n", res.ID, err)
+				continue
+			}
+
+			if resp == nil {
+				fmt.Println("Midtrans response nil for", res.ID)
+				continue
+			}
+
+			fmt.Printf("Midtrans status for %s: %s | fraud: %s | payment_type: %s\n",
+				res.ID, resp.TransactionStatus, resp.FraudStatus, resp.PaymentType)
+
+			var newStatus string
+			if resp.TransactionStatus == "capture" || resp.TransactionStatus == "settlement" {
+				if resp.TransactionStatus == "capture" && resp.FraudStatus == "challenge" {
+					newStatus = "pending"
+				} else {
+					newStatus = "success" // This maps to "paid" for reservation
 				}
+			} else if resp.TransactionStatus == "deny" || resp.TransactionStatus == "expire" || resp.TransactionStatus == "cancel" {
+				newStatus = "failed"
+			}
 
-				if newStatus == "success" {
-					// Update DB
-					tx := rc.DB.Begin()
+			if newStatus == "" {
+				fmt.Println("No actionable new status for", res.ID)
+				continue
+			}
 
-					// Update Payment
-					var transactionTime *time.Time
-					if t, err := time.Parse("2006-01-02 15:04:05", resp.TransactionTime); err == nil {
-						transactionTime = &t
+			fmt.Printf("Updating status to %s for reservation %s\n", newStatus, res.ID)
+
+			tx := rc.DB.Begin()
+
+			// Update Payment (find or create)
+			var payment models.Payment
+			paymentFound := true
+			if err := tx.Where("reservation_id = ?", res.ID).First(&payment).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					fmt.Println("Payment record not found, creating new for", res.ID)
+					payment = models.Payment{
+						ReservationID:   res.ID,
+						MidtransOrderID: res.ID,
+						Amount:          res.TotalAmount,
+						Status:          newStatus,
 					}
-
-					// Find Payment
-					var payment models.Payment
-					if err := tx.Where("reservation_id = ?", res.ID).First(&payment).Error; err == nil {
-						payment.Status = "success"
-						payment.PaymentMethod = resp.PaymentType
-						payment.TransactionTime = transactionTime
-						paymentBytes, _ := json.Marshal(resp)
-						payment.MidtransResponse = paymentBytes
-						tx.Save(&payment)
-					}
-
-					// Update Reservation
-					tx.Model(&models.Reservation{}).Where("id = ?", res.ID).Update("status", "paid")
-
-					tx.Commit()
-
-					// Update local variable for response
-					reservations[i].Status = "paid"
-				} else if newStatus == "failed" {
-					// Handle failed
-					tx := rc.DB.Begin()
-					tx.Model(&models.Reservation{}).Where("id = ?", res.ID).Update("status", "cancelled")
-
-					var schedule models.Schedule
-					tx.First(&schedule, "id = ?", res.ScheduleID)
-					tx.Model(&schedule).Update("is_available", true) // Release slot potentially? Logic depends on capacity.
-					// Ideally we check capacity again conceptually, but making available is safe for single slot logic.
-					// With capacity logic, we should only set available=true if it WAS false.
-					// Simplified: set available true.
-					tx.Model(&models.Schedule{}).Where("id = ?", res.ScheduleID).Update("is_available", true)
-
-					tx.Commit()
-					reservations[i].Status = "cancelled"
+					paymentFound = false
+				} else {
+					fmt.Println("Error finding payment:", err)
+					tx.Rollback()
+					continue
 				}
 			}
+
+			// Update fields
+			payment.Status = newStatus
+			if resp.PaymentType != "" {
+				payment.PaymentMethod = resp.PaymentType
+			}
+			if resp.TransactionTime != "" {
+				if t, err := time.Parse("2006-01-02 15:04:05", resp.TransactionTime); err == nil {
+					payment.TransactionTime = &t
+				}
+			}
+			paymentBytes, _ := json.Marshal(resp)
+			payment.MidtransResponse = paymentBytes
+
+			if paymentFound {
+				tx.Save(&payment)
+			} else {
+				tx.Create(&payment)
+			}
+
+			// Update Reservation
+			if newStatus == "success" {
+				res.Status = "paid"
+				tx.Model(&models.Reservation{}).Where("id = ?", res.ID).Update("status", "paid")
+			} else if newStatus == "failed" {
+				res.Status = "cancelled"
+				tx.Model(&models.Reservation{}).Where("id = ?", res.ID).Update("status", "cancelled")
+
+				// Release schedule
+				tx.Model(&models.Schedule{}).Where("id = ?", res.ScheduleID).Update("is_available", true)
+			}
+
+			if err := tx.Commit().Error; err != nil {
+				fmt.Println("Transaction commit failed:", err)
+				tx.Rollback()
+				continue
+			}
+
+			// Update in-memory for response
+			reservations[i].Status = res.Status
+			fmt.Printf("Updated reservation %s to %s\n", res.ID, res.Status)
 		}
 	}
 

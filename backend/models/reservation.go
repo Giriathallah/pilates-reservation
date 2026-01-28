@@ -10,7 +10,7 @@ type Reservation struct {
 	User        User      `gorm:"constraint:OnDelete:CASCADE;" json:"user"`
 	CourtID     string    `gorm:"type:uuid;not null" json:"court_id"`
 	Court       Court     `gorm:"constraint:OnDelete:CASCADE;" json:"court"`
-	ScheduleID  string    `gorm:"type:uuid;not null;uniqueIndex" json:"schedule_id"`
+	ScheduleID  string    `gorm:"type:uuid;not null" json:"schedule_id"`
 	Schedule    Schedule  `gorm:"constraint:OnDelete:CASCADE;" json:"schedule"`
 	Status      string    `gorm:"default:'pending';check:status IN ('pending', 'confirmed', 'paid', 'cancelled', 'refunded')" json:"status"`
 	TotalAmount float64   `gorm:"type:decimal(10,2);not null" json:"total_amount"`

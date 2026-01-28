@@ -12,49 +12,44 @@ export default function SuccessPage() {
     const [message, setMessage] = useState("Verifying payment status...");
 
     useEffect(() => {
-        const checkStatus = async () => {
-            if (!reservationId) {
-                setStatus("success"); // Fallback if no ID provided (legacy behavior)
-                return;
-            }
+        if (!reservationId) return;
 
+        console.log("Polling status for reservation:", reservationId);
+
+        const poll = async () => {
             try {
-                // Determine implicit status from URL if provided (legacy handling), but verify with backend
-                // The Proactive Check is triggered by calling GetMyReservations
-                // We'll call it, then find our specific reservation to see its status
-                setMessage("Syncing with bank...");
                 const res = await api.get("/reservations/my");
-                const bookings = res.data.data;
-                const currentBooking = bookings.find((b: any) => b.id === reservationId);
+                console.log("Bookings from API:", res.data.data);
+                const booking = res.data.data.find((b: any) => b.id === reservationId);
 
-                if (currentBooking) {
-                    if (currentBooking.status === "paid" || currentBooking.status === "confirmed") {
+                if (booking) {
+                    console.log("Current booking status:", booking.status);
+                    if (booking.status === "paid" || booking.status === "confirmed") {
                         setStatus("success");
-                    } else if (currentBooking.status === "pending") {
+                        // setMessage("Booking Confirmed!"); // Don't override message component if status changes UI
+                    } else if (booking.status === "pending") {
                         setStatus("pending");
-                    } else if (currentBooking.status === "cancelled" || currentBooking.status === "failed") {
+                        setMessage("Still waiting for payment confirmation...");
+                    } else if (booking.status === "cancelled" || booking.status === "failed") {
                         setStatus("failed");
-                    } else {
-                        setStatus("success"); // Default safe
+                        setMessage("Payment was cancelled or failed.");
                     }
                 } else {
-                    // Not found? Maybe wrong user or delay
+                    console.log("Booking not found in list yet");
                     setStatus("pending");
                 }
-
-            } catch (error) {
-                console.error("Verification failed", error);
-                setStatus("pending"); // Assume pending on error
-                setMessage("Could not verify status automatically. Please check dashboard.");
+            } catch (err) {
+                console.error("Poll error:", err);
             }
         };
 
-        // Delay slightly to ensure backend Proactive Check has time to run if it was a race
-        const timer = setTimeout(() => {
-            checkStatus();
-        }, 1500);
+        // Initial check
+        poll();
 
-        return () => clearTimeout(timer);
+        // Poll every 3 seconds
+        const interval = setInterval(poll, 3000);
+
+        return () => clearInterval(interval);
     }, [reservationId]);
 
     return (

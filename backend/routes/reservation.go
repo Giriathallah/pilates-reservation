@@ -29,5 +29,6 @@ func SetupReservationRoutes(app *fiber.App, db *gorm.DB, mt *services.MidtransSe
 	reservation := api.Group("/reservations", middleware.Protected())
 	reservation.Get("/my", resController.GetMyReservations)
 	reservation.Post("/", resController.CreateReservation)
+	reservation.Post("/:id/mark-paid", resController.MarkReservationAsPaid)
 	reservation.Post("/:id/cancel", resController.CancelReservation)
 }
