@@ -112,7 +112,7 @@ export default function LandingPageContent() {
                         {[
                             { title: "Signature Reformer", desc: "A full-body flow focused on strength and length.", img: "https://images.unsplash.com/photo-1518310383802-640c2de311b2?q=80&w=2940&auto=format&fit=crop" },
                             { title: "Core Matwork", desc: "The fundamentals of control, precision, and core stability.", img: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?q=80&w=2940&auto=format&fit=crop" },
-                            { title: "Private Studio", desc: "One-on-one tailored sessions for your unique goals.", img: "https://images.unsplash.com/photo-1544367563-12123d8965cd?q=80&w=2940&auto=format&fit=crop" },
+                            { title: "Private Studio", desc: "One-on-one tailored sessions for your unique goals.", img: "https://images.unsplash.com/photo-1783841193384-4269c68aa050?q=80&w=1200&auto=format&fit=crop" },
                         ].map((cls, idx) => (
                             <div key={idx} className="group relative h-[450px] overflow-hidden rounded-xl ethereal-shadow">
                                 <Image

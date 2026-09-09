@@ -76,7 +76,7 @@ export default function DateStep({ selectedDate, onSelect, onNext }: DateStepPro
                 ) : (
                     <DatePicker
                         selected={selectedDate}
-                        onChange={(date) => date && onSelect(date)}
+                        onChange={(date: Date | null) => date && onSelect(date)}
                         inline
                         minDate={new Date()}
                         maxDate={addDays(new Date(), 30)}

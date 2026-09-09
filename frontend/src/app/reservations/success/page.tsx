@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 
 export default function SuccessPage() {
-    const searchParams = useSearchParams();
-    const reservationId = searchParams.get("id");
+    const reservationId = typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("id")
+        : null;
     const [status, setStatus] = useState<"loading" | "success" | "pending" | "failed">("loading");
     const [message, setMessage] = useState("Verifying payment status...");
 
